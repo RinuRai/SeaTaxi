@@ -55,10 +55,10 @@ const upload = multer({
   },
 });
 const connection = mysql.createConnection({
-  host: "b8s1vhjc96jdaztkviqo-mysql.services.clever-cloud.com",
-  user: "unl5bwnlb3j3bvvt",
-  password: "NJpVLHj2rEJOYU7Jp7Fw",
-  database: "b8s1vhjc96jdaztkviqo",
+  host: "localhost",
+  user: "root",
+  password: "",
+  database: "taxi_booking",
 });
 connection.connect((err) => {
   if (err) {
@@ -305,6 +305,24 @@ app.post("/api/checkBookingAvailability", (req, res) => {
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+// Function to insert notification after booking
+const insertNotification = (logName, carName, logId, connection) => {
+  // Generate the message
+  const msg = `${carName} was booked by ${logName}`;
+  // Get the current timestamp
+  const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  // SQL query to insert the notification
+  const sql = "INSERT INTO taxi_notific (send, recv, msg, visible, time) VALUES (?, ?, ?, ?, ?)";
+  const values = [logId, 'ADMIN', msg, false, timestamp];
+  // Execute the query
+  connection.query(sql, values, (err, result) => {
+    if (err) {
+      console.error("Error inserting notification:", err);
+    } else {
+      console.log("Notification inserted successfully");
+    }
+  });
+};
 // Route to handle form submission
 app.post("/api/booking", (req, res) => {
   const {
@@ -346,6 +364,8 @@ app.post("/api/booking", (req, res) => {
       return;
     }
     console.log("Booking inserted successfully");
+    // Insert notification after successful booking
+    insertNotification(logName, cartoken, Logid, connection);
     res.send("Booking inserted successfully");
   });
 });
@@ -456,8 +476,25 @@ app.get("/api/AllBookingDetails", (req, res) => {
 
 //////////////////////////////////////////////////////////////////////////////////////
 
+// Function to insert notification after booking approval
+const insertNotification2 = (send, recv, msg, visible, connection) => {
+  // Get the current timestamp
+  const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  // SQL query to insert the notification
+  const sql = "INSERT INTO taxi_notific (send, recv, msg, visible, time) VALUES (?, ?, ?, ?, ?)";
+  const values = [send, recv, msg, visible, timestamp];
+  // Execute the query
+  connection.query(sql, values, (err, result) => {
+    if (err) {
+      console.error("Error inserting notification:", err);
+    } else {
+      console.log("Notification inserted successfully");
+    }
+  });
+};
+// Route to handle booking approval
 app.post("/api/bookingApproved", (req, res) => {
-  const { id, carid, verify } = req.body;
+  const { id, carid, verify, cl_id } = req.body;
   const sql = "UPDATE booking SET verify = ? WHERE id = ? AND car_id = ?";
   connection.query(sql, [verify, id, carid], (err, result) => {
     if (err) {
@@ -466,10 +503,20 @@ app.post("/api/bookingApproved", (req, res) => {
       return;
     }
     console.log("Booking approved successfully");
+    // Determine message based on verification status
+    let msg;
+    if (verify == '200') {
+      msg = "Your booking was accepted by ADMIN";
+    } else if (verify == '404') {
+      msg = "Your booking was cancelled by ADMIN";
+    }
+    // Insert notification
+    insertNotification2('ADMIN', cl_id, msg, false, connection);
     res.status(200).json({ message: "Booking approved successfully" });
   });
-
 });
+
+
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -589,6 +636,50 @@ app.post('/api/fetchUserByNumberAndOTP', async (req, res) => {
     console.error('Failed to fetch user by number and OTP:', error);
     res.status(500).send('Failed to fetch user by number and OTP');
   }
+});
+////////////////////////////////////////////////////////////////////////////
+
+// Route to handle fetching notifications
+app.post("/api/getNotific", (req, res) => {
+  const { who, lgid } = req.body;
+  let sql;
+  let values;
+  if (who === 'ADMIN') {
+    // Fetch notifications where recv field is ADMIN
+    sql = "SELECT * FROM taxi_notific WHERE recv = ?";
+    values = ['ADMIN'];
+  } else {
+    // Fetch notifications where recv field is the provided lgid
+    sql = "SELECT * FROM taxi_notific WHERE recv = ?";
+    values = [lgid];
+  }
+  // Execute the query
+  connection.query(sql, values, (err, result) => {
+    if (err) {
+      console.error("Error fetching notifications:", err);
+      res.status(500).send("Error fetching notifications");
+      return;
+    }
+    console.log("Notifications fetched successfully");
+    res.status(200).json(result);
+  });
+});
+/////////////////////////////////////////////////////////////////////////////////
+
+
+// Route to handle marking a notification as read
+app.post("/api/MarkasRead", (req, res) => {
+  const { notific_id } = req.body;
+  const sql = "UPDATE taxi_notific SET visible = 1 WHERE id = ?";
+  connection.query(sql, [notific_id], (err, result) => {
+    if (err) {
+      console.error("Error marking notification as read:", err);
+      res.status(500).send("Error marking notification as read");
+      return;
+    }
+    console.log("Notification marked as read successfully");
+    res.status(200).send("Notification marked as read successfully");
+  });
 });
 
 ///////////////////////////////////////////////////////////////////////////////////////
