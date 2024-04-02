@@ -513,10 +513,10 @@ app.post('/api/sendOtp', async (req, res) => {
   try {
     const { us_nm, number } = req.body;
     // Use promise-based query by calling con.promise().query() instead of connection.query()
-    const [existingUser] = await connection.promise().query('SELECT * FROM taxi_auth WHERE usr_name = ? AND usr_num = ?', [us_nm, number]);
+    const [existingUser] = await connection.promise().query('SELECT * FROM taxi_auth WHERE usr_num = ?', [ number]);
     if (existingUser && existingUser.length > 0) {
       const otp = generateOTP();
-      await connection.promise().query('UPDATE taxi_auth SET otp = ? WHERE usr_name = ? AND usr_num = ?', [otp, us_nm, number]);
+      await connection.promise().query('UPDATE taxi_auth SET otp = ? , usr_name = ? WHERE usr_num = ?', [otp, us_nm, number]);
       console.log(`OTP ${otp} updated in the database for user ${us_nm} with mobile number ${number}.`);
       // Send OTP to the provided number
       const response = await axios.get(`http://login.smsgatewayhub.com/api/mt/SendSMS?user=Seasensesoftwares&password=Stripl@1&senderid=SEASEN&channel=Trans&DCS=0&flashsms=0&number=${number}&text=Dear ${otp}, Many more happy returns of the day. With regards Sea Sense Group.&route=47&DLTTemplateId=1707161044624969443&PEID=1701159125640974053`);
