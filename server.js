@@ -55,10 +55,10 @@ const upload = multer({
   },
 });
 const connection = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "",
-  database: "taxi_booking",
+  host: "b8s1vhjc96jdaztkviqo-mysql.services.clever-cloud.com",
+  user: "unl5bwnlb3j3bvvt",
+  password: "NJpVLHj2rEJOYU7Jp7Fw",
+  database: "b8s1vhjc96jdaztkviqo",
 });
 connection.connect((err) => {
   if (err) {
