@@ -681,6 +681,34 @@ app.post("/api/MarkasRead", (req, res) => {
     res.status(200).send("Notification marked as read successfully");
   });
 });
+/////////////////////////////////////////////////////////////////////////////////
+
+// Route to handle fetching notification counts
+app.post("/api/getNotificCOUNT", (req, res) => {
+  const { who, lgid } = req.body;
+  let sql;
+  let values;
+  if (who === 'ADMIN') {
+    // Count notifications where recv field is ADMIN and visible is 0
+    sql = "SELECT COUNT(*) AS count FROM taxi_notific WHERE recv = ? AND visible = 0";
+    values = ['ADMIN'];
+  } else {
+    // Count notifications where recv field is the provided lgid and visible is 0
+    sql = "SELECT COUNT(*) AS count FROM taxi_notific WHERE recv = ? AND visible = 0";
+    values = [lgid];
+  }
+  // Execute the query
+  connection.query(sql, values, (err, result) => {
+    if (err) {
+      console.error("Error fetching notification count:", err);
+      res.status(500).send("Error fetching notification count");
+      return;
+    }
+    console.log("Notification count fetched successfully");
+    res.status(200).json(result[0].count); // Return the count of notifications
+  });
+});
+
 
 ///////////////////////////////////////////////////////////////////////////////////////
 app.listen(port, () => {
