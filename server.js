@@ -646,11 +646,11 @@ app.post("/api/getNotific", (req, res) => {
   let values;
   if (who === 'ADMIN') {
     // Fetch notifications where recv field is ADMIN
-    sql = "SELECT * FROM taxi_notific WHERE recv = ?";
+    sql = "SELECT * FROM taxi_notific WHERE recv = ? ORDER BY id DESC";
     values = ['ADMIN'];
   } else {
     // Fetch notifications where recv field is the provided lgid
-    sql = "SELECT * FROM taxi_notific WHERE recv = ?";
+    sql = "SELECT * FROM taxi_notific WHERE recv = ? ORDER BY id DESC";
     values = [lgid];
   }
   // Execute the query
