@@ -4,6 +4,7 @@ const mysql = require("mysql2");
 const cors = require("cors");
 const axios = require("axios");
 const fs = require("fs");
+const path = require('path');
 const multer = require("multer");
 const crypto = require('crypto');
 const app = express();
@@ -24,12 +25,10 @@ const storage = multer.diskStorage({
       uploadPath = "uploads/license_image/";
     } else if (file.fieldname === "bus_pic") {
       uploadPath = "uploads/bus_image/";
-    } else if (file.fieldname === "gallery_images") { // Check for gallery_images field
+    } else if (file.fieldname === "gallery_images") { 
       uploadPath = "uploads/gallery_images/";
     }
-console.log("uploadPath",uploadPath)
     cb(null, uploadPath); // Save uploaded files to the appropriate directory
-
   },
 
   filename: function (req, file, cb) {
@@ -141,10 +140,9 @@ app.put(
   ]),
   (req, res) => {
     const formData = req.body;
-    // Assuming you have a database table named 'taxi' to store taxi entries
-    // Example of how to update data in the database
     let sql =
-    "UPDATE taxi SET one_day_rent = COALESCE(?, one_day_rent), price_per_km = COALESCE(?, price_per_km), driver_name = COALESCE(?, driver_name), driver_number = COALESCE(?, driver_number), experience = COALESCE(?, experience) WHERE id = ?";
+      "UPDATE taxi SET one_day_rent = COALESCE(?, one_day_rent), price_per_km = COALESCE(?, price_per_km), driver_name = COALESCE(?, driver_name), driver_number = COALESCE(?, driver_number), experience = COALESCE(?, experience)";
+
     const values = [
       formData.rent || null,
       formData.cost_km || null,
@@ -152,10 +150,10 @@ app.put(
       formData.driv_num || null,
       formData.driv_exp || null,
     ];
-    // If any image was uploaded, update the corresponding column in the database
+
     if (req.files && req.files.driver_pic) {
       sql += ", driver_photo_path = ?";
-      values.push(req.files.driver_pic[0].path); // Assuming 'path' contains the file path
+      values.push(req.files.driver_pic[0].path);
     }
     if (req.files && req.files.bus_pic) {
       sql += ", car_photo = ?";
@@ -165,7 +163,10 @@ app.put(
       sql += ", license_path = ?";
       values.push(req.files.lic_pic[0].path);
     }
-    values.push(req.params.id); // id of the taxi entry to be updated
+
+    sql += " WHERE id = ?";
+    values.push(req.params.id);
+
     connection.query(sql, values, (err, result) => {
       if (err) {
         console.error("Error updating taxi:", err);
@@ -173,7 +174,6 @@ app.put(
         return;
       }
       console.log("Taxi updated successfully");
-      console.log("formdata", formData);
       res.send("Taxi updated successfully");
     });
   }
@@ -231,10 +231,11 @@ app.post("/api/addTaxiGallery", upload.array("gallery_images", 10), (req, res) =
           }
           console.log("Image inserted into taxi_gallery successfully");
           
-          // Copy image to gallery folder
+          // Construct destination path for copying image to gallery folder
           const fileName = image.filename; // Assuming filename is unique
-          const destination = '' + fileName;
+          const destination = path.join(__dirname, 'uploads', 'gallery_images', fileName);
           
+          // Copy image to gallery folder
           fs.copyFile(image.path, destination, (err) => {
               if (err) {
                   console.error("Error copying image to gallery folder:", err);
@@ -247,9 +248,6 @@ app.post("/api/addTaxiGallery", upload.array("gallery_images", 10), (req, res) =
   
   res.send("Images added to taxi_gallery and copied to gallery folder successfully with token " + token);
 });
-
-
-
 
 
 // Route to delete a taxi entry
@@ -267,7 +265,7 @@ app.delete("/api/deleteTaxi", (req, res) => {
   });
 }); 
 
-
+////////////////////////////////////////////////////////////////////////////////////
 
 app.get("/getGalleryImg/:token", (req, res) => {
   const token = req.params.token;
@@ -281,7 +279,54 @@ app.get("/getGalleryImg/:token", (req, res) => {
     res.json(results);
   });
 });
+///////////////////////////////////////////////////////////////////////////////////
 
+// Route to delete a taxi entry
+// app.delete("/api/deleteGalImg", (req, res) => {
+//   const  Imgid  = req.body.img_Id; // Retrieve id and token from the request body
+//   const sql = "DELETE FROM taxi_gallery WHERE id = ?";
+//   connection.query(sql, [Imgid], (err, result) => {
+//     if (err) {
+//       console.error("Error deleting Image:", err);
+//       res.status(500).send("Error deleting Image");
+//       return;
+//     }
+//     console.log("Image deleted successfully");
+//     res.send("Image deleted successfully");
+//   });
+// });
+
+app.delete("/api/deleteGalImg", (req, res) => {
+  const Imgid = req.body.img_Id; // Retrieve id from the request body
+  const imagePath = `${req.body.filename}`; // Construct the file 
+  console.log('imagepath',imagePath)
+  const sql = "DELETE FROM taxi_gallery WHERE id = ?";
+  // Delete the image file
+  fs.unlink(imagePath, (err) => {
+    if (err && err.code === 'ENOENT') {
+      // If the file doesn't exist, it's already deleted, so just proceed with the database deletion
+      console.warn("Image file not found:", err);
+    } else if (err) {
+      // If there's an error other than file not found, log and send an error response
+      console.error("Error deleting image file:", err);
+      res.status(500).send("Error deleting image file");
+      return;
+    } else {
+      // Log that the image file was successfully deleted
+      console.log("Image file deleted successfully:", imagePath);
+    }
+    // Now delete the record from the database
+    connection.query(sql, [Imgid], (err, result) => {
+      if (err) {
+        console.error("Error deleting image record:", err);
+        res.status(500).send("Error deleting image record");
+        return;
+      }
+      console.log("Image record deleted successfully");
+      res.send("Image record deleted successfully");
+    });
+  });
+});
 //////////////////////////////////////////////////////////////////////////////////////
 
 // Route to check if a token exists between start date and end date with verify condition
@@ -681,7 +726,8 @@ app.post("/api/MarkasRead", (req, res) => {
     res.status(200).send("Notification marked as read successfully");
   });
 });
-/////////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////
 
 // Route to handle fetching notification counts
 app.post("/api/getNotificCOUNT", (req, res) => {
@@ -706,6 +752,20 @@ app.post("/api/getNotificCOUNT", (req, res) => {
     }
     console.log("Notification count fetched successfully");
     res.status(200).json(result[0].count); // Return the count of notifications
+  });
+});
+
+//////////////////////////////////////////////////////////////////////////////////////
+
+app.get("/api/getDriverDtls", (req, res) => {
+  const sql = "SELECT driver_name, MAX(driver_number) as driver_number, MAX(driver_photo_path) as driver_photo_path, MAX(experience) as experience FROM taxi GROUP BY driver_name ORDER BY id DESC";
+  connection.query(sql, (err, results) => {
+    if (err) {
+      console.error("Error fetching taxi entries: ", err);
+      res.status(500).send("Error fetching taxi entries");
+      return;
+    }
+    res.json(results);
   });
 });
 
